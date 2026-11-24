@@ -4,6 +4,13 @@
  */
 package ativosti;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import javax.swing.JOptionPane;
+
 /**
  *
  * @author emmanuel.7931
@@ -11,12 +18,135 @@ package ativosti;
 public class Ativos extends javax.swing.JFrame {
     
     private static final java.util.logging.Logger logger = java.util.logging.Logger.getLogger(Ativos.class.getName());
+    
+    private Connection conn;
+    
+    private static final String TABELA = "ativos";
 
     /**
      * Creates new form Ativos
      */
     public Ativos() {
         initComponents();
+        
+        conectarBD();
+    }
+    
+    private void conectarBD() {
+        try {
+            String url = "jdbc:mysql://34.139.193.0/manuel";
+            String usuario = "root";  // Substitua pelo seu usuário
+            String senha = "Senac#26";        // Substitua pela sua senha
+
+            conn = DriverManager.getConnection(url, usuario, senha);
+            JOptionPane.showMessageDialog(this, "Conexão ao banco de dados estabelecida.");
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Erro ao conectar ao banco de dados: " + e.getMessage());
+        }
+    }
+    
+    private void marcarSituacao(String situacao) {
+        buttonGroup1.clearSelection();
+        if ("Disponível".equals(situacao)) {
+            disponivel.setSelected(true);
+        } else if ("Em uso".equals(situacao)) {
+            emuso.setSelected(true);
+        } else if ("Manutenção".equals(situacao)) {
+            manutencao.setSelected(true);
+        }
+    }
+    
+    private String lerSituacao() {
+        if (disponivel.isSelected()) {
+            return "Disponível";
+        }
+        if (emuso.isSelected()) {
+            return "Em uso";
+        }
+        if (manutencao.isSelected()) {
+            return "Manutenção";
+        }
+        return null;
+    }
+    
+    private void limpar() {
+        patrimonio.setText("");
+        nomeEquipamento.setText("");
+        setor.setText("");
+        ativos.setSelectedIndex(0);
+        buttonGroup1.clearSelection();
+        sim.setSelected(false);
+        nao.setSelected(false);
+    }
+    
+    private void listar() {
+        if (conn == null) {
+            return;
+        }
+        try {
+            String sql = "SELECT * FROM " + TABELA + " ORDER BY id";
+            PreparedStatement stmt = conn.prepareStatement(sql);
+            ResultSet rs = stmt.executeQuery();
+
+            StringBuilder texto = new StringBuilder("<html>");
+            boolean vazio = true;
+            while (rs.next()) {
+                vazio = false;
+                texto.append(rs.getString("patrimonio")).append(" | ")
+                     .append(rs.getString("nome")).append(" | ")
+                     .append(rs.getString("tipo")).append(" | ")
+                     .append(rs.getString("setor")).append(" | ")
+                     .append(rs.getString("situacao")).append(" | Garantia: ")
+                     .append(rs.getBoolean("garantia") ? "Sim" : "Não")
+                     .append("<br>");
+            }
+            if (vazio) {
+                texto.append("Nenhum ativo cadastrado.");
+            }
+            texto.append("</html>");
+            lista.setText(texto.toString());
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Erro ao listar ativos: " + e.getMessage());
+        }
+    }
+    
+    private boolean semConexao() {
+        if (conn == null) {
+            JOptionPane.showMessageDialog(this, "Sem conexão com o banco de dados.");
+            return true;
+        }
+        return false;
+    }
+
+    // true = Sim, false = Não, null = nenhuma (ou as duas) marcada
+    private Boolean lerGarantia() {
+        if (sim.isSelected() && !nao.isSelected()) {
+            return true;
+        }
+        if (nao.isSelected() && !sim.isSelected()) {
+            return false;
+        }
+        return null;
+    }
+
+    private boolean validar() {
+        if (patrimonio.getText().trim().isEmpty()
+                || nomeEquipamento.getText().trim().isEmpty()
+                || setor.getText().trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Preencha patrimônio, nome do equipamento e setor.");
+            return false;
+        }
+        if (lerSituacao() == null) {
+            JOptionPane.showMessageDialog(this, "Escolha a situação do equipamento.");
+            return false;
+        }
+        if (lerGarantia() == null) {
+            JOptionPane.showMessageDialog(this, "Marque apenas uma opção de garantia: sim ou não.");
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -71,12 +201,27 @@ public class Ativos extends javax.swing.JFrame {
 
         buttonGroup1.add(disponivel);
         disponivel.setText("disponivel");
+        disponivel.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                disponivelMouseClicked(evt);
+            }
+        });
 
         buttonGroup1.add(emuso);
         emuso.setText("em uso");
+        emuso.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                emusoMouseClicked(evt);
+            }
+        });
 
         buttonGroup1.add(manutencao);
         manutencao.setText("manutenção");
+        manutencao.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                manutencaoMouseClicked(evt);
+            }
+        });
 
         jLabel1.setText("Possui garantia");
 
@@ -208,19 +353,117 @@ public class Ativos extends javax.swing.JFrame {
 
     private void salvarMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_salvarMouseClicked
         // TODO add your handling code here:
+        
+        if (semConexao() || !validar()) {
+            return;
+        }
+        try {
+            // 6 colunas = 6 interrogações = 6 stmt.set...
+            String sql = "INSERT INTO " + TABELA
+                    + " (patrimonio, nome, tipo, setor, situacao, garantia) VALUES (?, ?, ?, ?, ?, ?)";
+            PreparedStatement stmt = conn.prepareStatement(sql);
+            stmt.setString(1, patrimonio.getText().trim());
+            stmt.setString(2, nomeEquipamento.getText().trim());
+            stmt.setString(3, String.valueOf(ativos.getSelectedItem()));
+            stmt.setString(4, setor.getText().trim());
+            stmt.setString(5, lerSituacao());
+            stmt.setBoolean(6, lerGarantia());
+            stmt.executeUpdate();
+            JOptionPane.showMessageDialog(this, "Equipamento cadastrado com sucesso!");
+            limpar();
+            listar();
+        } catch (java.sql.SQLIntegrityConstraintViolationException e) {
+            JOptionPane.showMessageDialog(this, "Já existe um equipamento com esse patrimônio.");
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Erro ao cadastrar equipamento: " + e.getMessage());
+        }    
     }//GEN-LAST:event_salvarMouseClicked
 
     private void editarMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_editarMouseClicked
         // TODO add your handling code here:
+        if (semConexao() || !validar()) {
+            return;
+        }
+        try {
+            // 5 campos no SET + 1 no WHERE = 6 interrogações
+            String sql = "UPDATE " + TABELA
+                    + " SET nome = ?, tipo = ?, setor = ?, situacao = ?, garantia = ? WHERE patrimonio = ?";
+            PreparedStatement stmt = conn.prepareStatement(sql);
+            stmt.setString(1, nomeEquipamento.getText().trim());
+            stmt.setString(2, String.valueOf(ativos.getSelectedItem()));
+            stmt.setString(3, setor.getText().trim());
+            stmt.setString(4, lerSituacao());
+            stmt.setBoolean(5, lerGarantia());
+            stmt.setString(6, patrimonio.getText().trim());
+            int linhas = stmt.executeUpdate();
+ 
+            if (linhas == 0) {
+                JOptionPane.showMessageDialog(this, "Nenhum equipamento com esse patrimônio.");
+                return;
+            }
+            JOptionPane.showMessageDialog(this, "Equipamento atualizado com sucesso!");
+            limpar();
+            listar();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Erro ao atualizar equipamento: " + e.getMessage());
+        }    
     }//GEN-LAST:event_editarMouseClicked
 
     private void excluirMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_excluirMouseClicked
         // TODO add your handling code here:
+        
+        if (semConexao()) {
+            return;
+        }
+        String pat = patrimonio.getText().trim();
+        if (pat.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Digite o patrimônio do equipamento a excluir.");
+            return;
+        }
+        int resposta = JOptionPane.showConfirmDialog(this,
+                "Excluir o equipamento " + pat + "? Essa ação é permanente.",
+                "Confirmar exclusão", JOptionPane.YES_NO_OPTION);
+        if (resposta != JOptionPane.YES_OPTION) {
+            return;
+        }
+        try {
+            String sql = "DELETE FROM " + TABELA + " WHERE patrimonio = ?";
+            PreparedStatement stmt = conn.prepareStatement(sql);
+            stmt.setString(1, pat);
+            int linhas = stmt.executeUpdate();
+ 
+            if (linhas == 0) {
+                JOptionPane.showMessageDialog(this, "Nenhum equipamento com esse patrimônio.");
+                return;
+            }
+            JOptionPane.showMessageDialog(this, "Equipamento excluído com sucesso!");
+            limpar();
+            listar();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Erro ao excluir equipamento: " + e.getMessage());
+        }        
     }//GEN-LAST:event_excluirMouseClicked
 
     private void cancelarMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_cancelarMouseClicked
         // TODO add your handling code here:
+    
+        limpar();
     }//GEN-LAST:event_cancelarMouseClicked
+
+    private void disponivelMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_disponivelMouseClicked
+        // TODO add your handling code here:
+    }//GEN-LAST:event_disponivelMouseClicked
+
+    private void emusoMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_emusoMouseClicked
+        // TODO add your handling code here:
+    }//GEN-LAST:event_emusoMouseClicked
+
+    private void manutencaoMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_manutencaoMouseClicked
+        // TODO add your handling code here:
+    }//GEN-LAST:event_manutencaoMouseClicked
 
     /**
      * @param args the command line arguments

@@ -161,6 +161,9 @@
         </Property>
         <Property name="text" type="java.lang.String" value="disponivel"/>
       </Properties>
+      <Events>
+        <EventHandler event="mouseClicked" listener="java.awt.event.MouseListener" parameters="java.awt.event.MouseEvent" handler="disponivelMouseClicked"/>
+      </Events>
     </Component>
     <Component class="javax.swing.JRadioButton" name="emuso">
       <Properties>
@@ -169,6 +172,9 @@
         </Property>
         <Property name="text" type="java.lang.String" value="em uso"/>
       </Properties>
+      <Events>
+        <EventHandler event="mouseClicked" listener="java.awt.event.MouseListener" parameters="java.awt.event.MouseEvent" handler="emusoMouseClicked"/>
+      </Events>
     </Component>
     <Component class="javax.swing.JRadioButton" name="manutencao">
       <Properties>
@@ -177,6 +183,9 @@
         </Property>
         <Property name="text" type="java.lang.String" value="manuten&#xe7;&#xe3;o"/>
       </Properties>
+      <Events>
+        <EventHandler event="mouseClicked" listener="java.awt.event.MouseListener" parameters="java.awt.event.MouseEvent" handler="manutencaoMouseClicked"/>
+      </Events>
     </Component>
     <Component class="javax.swing.JLabel" name="jLabel1">
       <Properties>
